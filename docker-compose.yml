@@ -1,0 +1,100 @@
+version: "3.8"
+
+x-common-variables: &common-variables
+  DJANGO_SETTINGS_MODULE: MoxieApp.settings
+  DATABASE_URL: postgresql://moxie:moxiepass@db:5432/moxiedb
+  REDIS_URL: redis://redis:6379/1
+  CELERY_BROKER_URL: redis://redis:6379/0
+
+services:
+  web:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/home/app/web
+      - static_volume:/home/app/web/staticfiles
+      - media_volume:/home/app/web/mediafiles
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *common-variables
+      DEBUG: 1
+      SECRET_KEY: your-secret-key-here
+    depends_on:
+      - db
+      - redis
+    networks:
+      - moxie-network
+
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=moxiedb
+      - POSTGRES_USER=moxie
+      - POSTGRES_PASSWORD=moxiepass
+    ports:
+      - "5432:5432"
+    networks:
+      - moxie-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moxie"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:6-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - moxie-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  celery:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A MoxieApp worker -l info
+    volumes:
+      - .:/home/app/web
+    environment:
+      <<: *common-variables
+    depends_on:
+      - redis
+      - db
+    networks:
+      - moxie-network
+
+  celery-beat:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A MoxieApp beat -l info
+    volumes:
+      - .:/home/app/web
+    environment:
+      <<: *common-variables
+    depends_on:
+      - redis
+      - db
+    networks:
+      - moxie-network
+
+networks:
+  moxie-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
