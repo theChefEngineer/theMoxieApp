@@ -14,7 +14,7 @@ This is a Django REST API for managing medspa services and appointments. The sys
 ### Using Docker
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/theChefEngineer/theMoxieApp.git
 cd MoxieApp
 ```
 
